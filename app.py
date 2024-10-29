@@ -135,7 +135,7 @@ if "user_data" in st.session_state:
         else:
             percentages_df = st.session_state.percentages_df
 
-        # Editor de datos interactivo
+        # Editor de datos interactivo (solo una vez)
         edited_percentages_df = st.data_editor(percentages_df, use_container_width=True, key="editor")
 
         # Comprobación de la suma de porcentajes
@@ -157,9 +157,6 @@ if "user_data" in st.session_state:
                 # Actualizar los valores en la tabla principal y guardarlos en session_state
                 st.session_state.percentages_df["Porcentaje (%)"] = adjusted_percentages
                 st.success("Los porcentajes han sido ajustados y guardados.")
-                
-                # Redibujar la tabla sin `st.experimental_rerun()`
-                st.data_editor(st.session_state.percentages_df, use_container_width=True, key="editor")
         else:
             st.success("La suma de los porcentajes es igual a 100%.")
 
@@ -258,3 +255,4 @@ if "user_data" in st.session_state:
             )
 
     st.write("Esta es una aplicación interactiva creada para simular ETFs y carteras patrimoniales.")
+
