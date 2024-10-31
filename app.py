@@ -2,55 +2,151 @@ import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
+from fpdf import FPDF
 from datetime import datetime, timedelta
-
-# Configuración de estilo para fondo negro en todas las gráficas
-plt.style.use('dark_background')
+import matplotlib.pyplot as plt
+import io
 
 # Configuración inicial de Streamlit
-st.set_page_config(page_title="Simulador de ETFs - Allianz Patrimonial", layout="wide")
+st.set_page_config(page_title="Simulador de Inversiones - Allianz Patrimonial", layout="wide")
 
-# --- Sección de Datos Iniciales del Usuario ---
-st.title("Simulador de Inversiones - Allianz Patrimonial")
+# Función para generar el PDF
+def generar_pdf(datos_personales, etfs_seleccionados, pesos, rendimiento, riesgo, simulacion_ahorro, grafico_simulacion):
+    pdf = FPDF()
+    pdf.add_page()
 
-st.header("Registro de Datos Personales")
+    # Encabezado
+    pdf.set_font("Arial", "B", 16)
+    pdf.set_text_color(0, 51, 102)  # Azul oscuro
+    pdf.image("Allianz logo.png", x=10, y=8, w=30)  # Logo Allianz en la parte superior izquierda
+    pdf.cell(200, 10, "Cotización de Inversión Patrimonial", ln=True, align="C")
+    pdf.ln(20)
 
-# Formularios de entrada para datos personales
-nombre = st.text_input("Nombre Completo")
-celular = st.text_input("Número de Celular")
-estado = st.selectbox("Estado", ["Selecciona...", "Aguascalientes", "Baja California", "Chihuahua", "CDMX", "Jalisco", "Nuevo León", "Puebla", "Yucatán", "Otro"])
-edad = st.number_input("Edad", min_value=18, max_value=100, step=1)
-email = st.text_input("Correo Electrónico")
+    # Sección 1: Datos Personales
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(200, 10, "Datos Personales", ln=True, align="L")
+    pdf.set_font("Arial", "", 12)
+    for campo, valor in datos_personales.items():
+        pdf.cell(200, 10, f"{campo}: {valor}", ln=True)
+    pdf.ln(10)  # Espacio adicional entre secciones
 
-# Validación para asegurarse de que los datos se hayan ingresado
-if st.button("Guardar Datos"):
-    if nombre and celular and estado != "Selecciona..." and edad and email:
-        st.session_state["user_data"] = {
-            "Nombre": nombre,
-            "Celular": celular,
-            "Estado": estado,
-            "Edad": edad,
-            "Email": email
-        }
-        st.success("Datos guardados exitosamente.")
-    else:
-        st.error("Por favor, completa todos los campos.")
+    # Sección 2: Simulación de Cartera
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(200, 10, "Simulación de Cartera", ln=True, align="L")
+    pdf.set_font("Arial", "", 12)
+    for etf, peso in zip(etfs_seleccionados, pesos):
+        pdf.cell(200, 10, f"{etf}: {peso}%", ln=True)
+    pdf.ln(10)  # Espacio adicional
 
-# Solo continuar si los datos están registrados
+    # Rendimiento y Riesgo de la Cartera
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(200, 10, "Rendimiento Esperado de la Cartera:", ln=True)
+    pdf.set_font("Arial", "", 12)
+    pdf.cell(200, 10, f"{rendimiento}%", ln=True)
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(200, 10, "Riesgo de la Cartera:", ln=True)
+    pdf.set_font("Arial", "", 12)
+    pdf.cell(200, 10, f"{riesgo}%", ln=True)
+    pdf.ln(15)  # Espacio adicional para separar secciones
+
+    # Sección 3: Simulador de Ahorro e Inversión Personalizada
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(200, 10, "Simulador de Ahorro e Inversión Personalizada", ln=True, align="L")
+    pdf.set_font("Arial", "", 12)
+    for campo, valor in simulacion_ahorro.items():
+        pdf.cell(200, 10, f"{campo}: {valor}", ln=True)
+    pdf.ln(10)  # Espacio adicional
+
+    # Análisis de Rendimiento
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(200, 10, "Análisis de Rendimiento", ln=True, align="L")
+    pdf.set_font("Arial", "", 12)
+    pdf.multi_cell(0, 10, f"El rendimiento promedio anual de la cartera seleccionada es de {rendimiento}%, con un riesgo asociado de {riesgo}%.")
+    pdf.ln(10)
+
+    # Gráfica del Simulador de Inversión al final de la página
+    pdf.add_page()  # Nueva página para el gráfico del simulador de inversión
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(200, 10, "Crecimiento de la Inversión", ln=True, align="L")
+    pdf.image(grafico_simulacion, x=10, y=30, w=180)  # Insertar gráfica de comparación de inversión vs. ahorro
+    pdf.ln(95)  # Añadir espacio adicional después de la imagen
+
+    # Guardar el PDF en un objeto de BytesIO para su descarga
+    pdf_output = io.BytesIO()
+    pdf.output(pdf_output)
+    pdf_output.seek(0)
+    return pdf_output
+
+# Función auxiliar para guardar gráficas
+def guardar_grafico(fig):
+    img = io.BytesIO()
+    fig.savefig(img, format="PNG")
+    img.seek(0)
+    return img
+
+# Nombres completos de los ETFs
+etf_names = {
+    "SPY": "SPDR S&P 500 ETF Trust",
+    "QQQ": "Invesco QQQ Trust",
+    "EEM": "iShares MSCI Emerging Markets ETF",
+    "IVV": "iShares Core S&P 500 ETF",
+    "IEMG": "iShares Core MSCI Emerging Markets ETF",
+    "VOO": "Vanguard S&P 500 ETF",
+    "VTI": "Vanguard Total Stock Market ETF",
+    "BND": "Vanguard Total Bond Market ETF",
+    "GLD": "SPDR Gold Shares"
+}
+
+# Crear lista de ETFs con nombres para los menús de selección
+etfs_with_names = [f"{ticker} ({name})" for ticker, name in etf_names.items()]
+etfs = list(etf_names.keys())  # Lista de tickers para el código interno
+
+# Página de Bienvenida
+with st.container():
+    st.title("¿Estás buscando planes de inversión?")
+    st.subheader("Maximiza el crecimiento y seguridad de tu patrimonio")
+    st.write("Agenda tu cita con un asesor y recibe un plan a tu medida.")
+
+    # Crear formulario utilizando componentes de Streamlit
+    nombre = st.text_input("Nombre Completo")
+    telefono = st.text_input("Número de Teléfono")
+    email = st.text_input("Correo Electrónico")
+    ciudad = st.text_input("Ciudad / Estado")
+    edad = st.number_input("Edad", min_value=18, max_value=100, step=1)
+
+    # Aceptación de política de privacidad
+    acepta_privacidad = st.checkbox("Acepto el Aviso de Privacidad")
+    if acepta_privacidad:
+        st.write("Al compartir tus datos, confirmas que tienes capacidad legal para contratar y que eres mayor de edad.")
+
+    # Botón para enviar los datos
+    if st.button("ENVIAR"):
+        if nombre and telefono and email and ciudad and edad and acepta_privacidad:
+            st.session_state["user_data"] = {
+                "Nombre": nombre,
+                "Teléfono": telefono,
+                "Email": email,
+                "Ciudad": ciudad,
+                "Edad": edad
+            }
+            st.success(f"Gracias {nombre}, hemos recibido tu información.")
+        else:
+            st.error("Por favor, completa todos los campos antes de enviar el formulario.")
+
+# Continuar a la aplicación solo si los datos están registrados
 if "user_data" in st.session_state:
     st.write(f"**Bienvenido, {st.session_state['user_data']['Nombre']}!**")
 
-    # --- Comienza el Simulador de ETFs y Crecimiento Patrimonial ---
-    
-    # Lista de ETFs populares
-    etfs = ["SPY", "QQQ", "EEM", "IVV", "IEMG", "VOO", "VTI", "BND", "GLD"]
-
-    # Sidebar para seleccionar el ETF y el periodo de tiempo
+    # Sidebar para seleccionar los ETFs y el periodo de tiempo
     st.sidebar.header("Selecciona las Opciones")
-    selected_etf = st.sidebar.selectbox("Selecciona un ETF", etfs)
-    start_date = st.sidebar.date_input("Fecha de inicio", datetime.now() - timedelta(days=365*5))
+    selected_etfs = st.sidebar.multiselect("Selecciona uno o más ETFs", etfs_with_names, [f"SPY ({etf_names['SPY']})", f"QQQ ({etf_names['QQQ']})"])
+
+    # Establecer la fecha de inicio para cubrir hasta 10 años
+    start_date = st.sidebar.date_input("Fecha de inicio", datetime.now() - timedelta(days=365 * 12))
     end_date = st.sidebar.date_input("Fecha de fin", datetime.now())
+
+    # Obtener solo los tickers seleccionados (sin los nombres completos)
+    selected_etfs = [ticker.split()[0] for ticker in selected_etfs]
 
     # Función para descargar datos
     @st.cache_data
@@ -65,31 +161,20 @@ if "user_data" in st.session_state:
             st.stop()
             return pd.DataFrame()
 
-    # Descarga de datos
-    data = download_data(selected_etf, start_date, end_date)
+    # Descarga de datos para cada ETF seleccionado y gráfico de desempeño comparativo
+    if selected_etfs:
+        st.header(f"Desempeño Comparativo de {', '.join(selected_etfs)}")
 
-    # Visualización de datos históricos con indicadores técnicos
-    st.header(f"Datos históricos de {selected_etf}")
-    # Cálculo de indicadores técnicos
-    data['SMA_50'] = data['Close'].rolling(window=50).mean()
-    data['SMA_200'] = data['Close'].rolling(window=200).mean()
-    data['RSI'] = 100 - (100 / (1 + data['Close'].pct_change().rolling(window=14).mean() / data['Close'].pct_change().rolling(window=14).std()))
+        precios = pd.DataFrame()
+        for ticker in selected_etfs:
+            data = download_data(ticker, start_date, end_date)
+            precios[ticker] = data['Close']
 
-    # Gráfico con medias móviles y RSI
-    fig, ax = plt.subplots(2, 1, figsize=(12, 8), sharex=True, gridspec_kw={'height_ratios': [3, 1]})
-    ax[0].plot(data['Close'], label="Precio de Cierre")
-    ax[0].plot(data['SMA_50'], label="SMA 50", linestyle="--")
-    ax[0].plot(data['SMA_200'], label="SMA 200", linestyle="--")
-    ax[0].set_title(f"{selected_etf} - Precio de Cierre y Medias Móviles")
-    ax[0].legend()
-    ax[0].set_ylabel("Precio")
-    ax[1].plot(data['RSI'], color='purple', label="RSI (14)")
-    ax[1].axhline(70, color='red', linestyle="--")
-    ax[1].axhline(30, color='green', linestyle="--")
-    ax[1].set_title("RSI (Índice de Fuerza Relativa)")
-    ax[1].set_ylabel("RSI")
-    ax[1].legend()
-    st.pyplot(fig)
+        # Normalizar los precios al valor inicial (1000 USD) para comparar desempeños
+        precios_normalizados = precios / precios.iloc[0] * 1000
+
+        # Mostrar gráfico comparativo con `st.line_chart`
+        st.line_chart(precios_normalizados, use_container_width=True)
 
     # Cálculos de rendimiento y riesgo
     st.header("Rendimiento y Riesgo")
@@ -99,35 +184,49 @@ if "user_data" in st.session_state:
         "3 años": 252*3, "5 años": 252*5, "10 años": 252*10
     }
 
-    rendimiento = {}
-    volatilidad = {}
+    # Inicializar diccionarios para almacenar los resultados
+    rendimiento = {periodo: {} for periodo in periodos}
+    volatilidad = {periodo: {} for periodo in periodos}
 
-    for periodo, days in periodos.items():
-        if len(data) >= days:
-            data_periodo = data['Close'].tail(days)
-            rendimiento[periodo] = round(float((data_periodo.iloc[-1] / data_periodo.iloc[0] - 1) * 100), 2)
-            volatilidad[periodo] = round(float(data_periodo.pct_change().std() * np.sqrt(252) * 100), 2)
+    # Calcular rendimiento y volatilidad para cada ETF y periodo
+    for ticker in selected_etfs:
+        for periodo, days in periodos.items():
+            if len(precios[ticker].dropna()) >= days:
+                data_periodo = precios[ticker].dropna().tail(days)
+                rendimiento[periodo][ticker] = round((data_periodo.iloc[-1] / data_periodo.iloc[0] - 1) * 100, 2)
+                volatilidad[periodo][ticker] = round(data_periodo.pct_change().std() * np.sqrt(252) * 100, 2)
+            else:
+                # Mostrar advertencia si no hay suficientes datos para el periodo
+                rendimiento[periodo][ticker] = "No hay datos suficientes"
+                volatilidad[periodo][ticker] = "No hay datos suficientes"
 
-    # Crear DataFrame para mostrar los resultados de rendimiento y volatilidad
-    rend_df = pd.DataFrame({
-        "Rendimiento (%)": list(rendimiento.values()),
-        "Volatilidad (%)": list(volatilidad.values())
-    }, index=rendimiento.keys())
+    # Crear DataFrames para mostrar los resultados de rendimiento y volatilidad
+    rend_df = pd.DataFrame(rendimiento)
+    vol_df = pd.DataFrame(volatilidad)
+
+    # Mostrar tablas de rendimiento y volatilidad
+    st.subheader("Rendimiento (%)")
     st.table(rend_df)
+
+    st.subheader("Volatilidad (%)")
+    st.table(vol_df)
 
     # Simulación de cartera
     st.header("Simulación de Cartera")
     num_assets = st.slider("Número de ETFs en la cartera", 1, len(etfs), 3)
-    selected_etfs = st.multiselect("Selecciona los ETFs para la cartera", etfs, etfs[:num_assets])
+    selected_etfs_for_portfolio = st.multiselect("Selecciona los ETFs para la cartera", etfs_with_names, etfs_with_names[:num_assets])
+
+    # Obtener solo los tickers seleccionados (sin los nombres completos) para la simulación de cartera
+    selected_etfs_for_portfolio = [ticker.split()[0] for ticker in selected_etfs_for_portfolio]
 
     # Configuración de la tabla de porcentajes
-    if selected_etfs:
-        initial_percentage = round(100 / len(selected_etfs), 2)
-        percentages = {etf: initial_percentage for etf in selected_etfs}
+    if selected_etfs_for_portfolio:
+        initial_percentage = round(100 / len(selected_etfs_for_portfolio), 2)
+        percentages = {etf: initial_percentage for etf in selected_etfs_for_portfolio}
 
         # Actualizar los datos en session_state solo si los ETFs seleccionados cambian
-        if "selected_etfs" not in st.session_state or st.session_state.selected_etfs != selected_etfs:
-            st.session_state.selected_etfs = selected_etfs
+        if "selected_etfs_for_portfolio" not in st.session_state or st.session_state.selected_etfs_for_portfolio != selected_etfs_for_portfolio:
+            st.session_state.selected_etfs_for_portfolio = selected_etfs_for_portfolio
             percentages_df = pd.DataFrame(list(percentages.items()), columns=["ETF", "Porcentaje (%)"])
             percentages_df["Porcentaje (%)"] = percentages_df["Porcentaje (%)"].astype(float)
             percentages_df.index += 1
@@ -164,18 +263,13 @@ if "user_data" in st.session_state:
 
         # Descargar datos de los ETFs seleccionados
         cartera_data = pd.DataFrame()
-        for ticker in selected_etfs:
+        for ticker in selected_etfs_for_portfolio:
             cartera_data[ticker] = download_data(ticker, start_date, end_date)['Close']
 
         # Verificar que los pesos coincidan con el número de ETFs seleccionados
         if len(weights) != len(cartera_data.columns):
             st.error("El número de pesos no coincide con el número de ETFs seleccionados. Ajusta la selección y los pesos.")
         else:
-            # Evolución histórica de la cartera
-            cartera_total = (cartera_data * weights).sum(axis=1)
-            st.header("Evolución Histórica de la Cartera")
-            st.line_chart(cartera_total, use_container_width=True)
-
             # Calcular rendimientos diarios y matriz de covarianza
             daily_returns = cartera_data.pct_change().dropna()
             cov_matrix = daily_returns.cov() * 252
@@ -185,11 +279,8 @@ if "user_data" in st.session_state:
             st.write("*Rendimiento Esperado de la Cartera (%):*", expected_return)
             st.write("*Riesgo de la Cartera (Volatilidad %):*", portfolio_volatility)
 
-            # Simulación de Ahorro e Inversión Personalizada
+            # Simulación de Ahorro e Inversión Personalizada con ajuste al crecimiento final
             st.header("Simulador de Ahorro e Inversión Personalizada")
-
-            # Usar el "Rendimiento Esperado de la Cartera" como tasa para el simulador
-            rendimiento_anual = expected_return / 100  # Convertir a decimal
 
             # Entradas del simulador
             aportacion_inicial = st.number_input("Aportación inicial", min_value=0, value=1000, step=100)
@@ -201,40 +292,37 @@ if "user_data" in st.session_state:
             frecuencias = {"Mensual": 12, "Semestral": 2, "Anual": 1}
             num_aportaciones_anuales = frecuencias[frecuencia_aportacion]
 
+            # Ajustar la tasa de rendimiento a la frecuencia de aportaciones
+            rendimiento_anual = expected_return / 100
+            tasa_aportacion = (1 + rendimiento_anual) ** (1 / num_aportaciones_anuales) - 1  # Tasa para cada aportación
+
             # Simulación de crecimiento de inversión con rendimiento y sin rendimiento
-            patrimonio_inversion = [aportacion_inicial]  # Lista para el crecimiento con rendimiento
-            patrimonio_ahorro = [aportacion_inicial]     # Lista para el ahorro sin rendimiento
+            patrimonio_inversion = [aportacion_inicial]
+            patrimonio_ahorro = [aportacion_inicial]
 
-            for year in range(1, horizonte_inversion + 1):
-                # Calcular el crecimiento anual con aportaciones periódicas para ambas líneas
-                for _ in range(num_aportaciones_anuales):
-                    # Inversión con rendimiento
-                    patrimonio_inversion[-1] += aportacion_periodica
-                    patrimonio_inversion[-1] *= (1 + rendimiento_anual / num_aportaciones_anuales)
-                    
-                    # Ahorro sin rendimiento (solo sumando las aportaciones)
-                    patrimonio_ahorro[-1] += aportacion_periodica
+            for _ in range(horizonte_inversion * num_aportaciones_anuales):
+                # Inversión con rendimiento
+                nuevo_valor_inversion = patrimonio_inversion[-1] + aportacion_periodica
+                nuevo_valor_inversion *= (1 + tasa_aportacion)
+                patrimonio_inversion.append(nuevo_valor_inversion)
                 
-                # Añadir el valor de fin de año a ambas listas
-                patrimonio_inversion.append(patrimonio_inversion[-1])
-                patrimonio_ahorro.append(patrimonio_ahorro[-1])
+                # Ahorro sin rendimiento
+                patrimonio_ahorro.append(patrimonio_ahorro[-1] + aportacion_periodica)
 
-            # Visualización de crecimiento de inversión
-            st.subheader("Evolución del Crecimiento de la Inversión vs. Ahorro sin Rendimiento")
-            plt.figure(figsize=(10, 6))
+            # Crear DataFrame para el gráfico de comparación de inversión vs. ahorro
+            inversion_df = pd.DataFrame({
+                "Inversión con Rendimiento": patrimonio_inversion,
+                "Ahorro sin Rendimiento": patrimonio_ahorro
+            }, index=[i / num_aportaciones_anuales for i in range(len(patrimonio_inversion))])
 
-            # Línea de inversión con rendimiento
-            plt.plot(range(horizonte_inversion + 1), patrimonio_inversion, marker='o', linestyle='-', label="Inversión con Rendimiento")
-
-            # Línea de ahorro sin rendimiento
-            plt.plot(range(horizonte_inversion + 1), patrimonio_ahorro, marker='o', linestyle='--', color="orange", label="Ahorro sin Rendimiento")
-
-            plt.xlabel("Años")
-            plt.ylabel("Valor de la Inversión")
-            plt.title("Comparación: Inversión con Rendimiento vs Ahorro sin Rendimiento")
-            plt.legend()
-            plt.grid(True)
-            st.pyplot(plt)
+            # Mostrar el gráfico de inversión vs. ahorro con `st.line_chart`
+            fig_simulador, ax = plt.subplots()
+            ax.plot(inversion_df.index, inversion_df["Inversión con Rendimiento"], label="Inversión con rendimiento")
+            ax.plot(inversion_df.index, inversion_df["Ahorro sin Rendimiento"], label="Ahorro sin rendimiento")
+            ax.set_title("Simulador de Ahorro e Inversión")
+            ax.legend()
+            grafico_simulacion = guardar_grafico(fig_simulador)
+            st.line_chart(inversion_df, use_container_width=True)
 
             # Mostrar el valor final de la inversión con rendimiento centrado y resaltado
             valor_final_inversion = patrimonio_inversion[-1]
@@ -254,5 +342,25 @@ if "user_data" in st.session_state:
                 unsafe_allow_html=True
             )
 
+            # Generación del PDF
+            if st.button("Descargar resumen en PDF"):
+                datos_personales = {
+                    "Nombre": st.session_state["user_data"]["Nombre"],
+                    "Teléfono": st.session_state["user_data"]["Teléfono"],
+                    "Email": st.session_state["user_data"]["Email"],
+                    "Ciudad": st.session_state["user_data"]["Ciudad"],
+                    "Edad": st.session_state["user_data"]["Edad"]
+                }
+                simulacion_ahorro = {
+                    "Aportación Inicial": f"${aportacion_inicial:,.2f}",
+                    "Aportación Periódica": f"${aportacion_periodica:,.2f}",
+                    "Frecuencia de Aportación": frecuencia_aportacion,
+                    "Horizonte de Inversión": f"{horizonte_inversion} años"
+                }
+                pdf_file = generar_pdf(datos_personales, selected_etfs_for_portfolio, weights * 100, expected_return, portfolio_volatility, simulacion_ahorro, grafico_simulacion)
+                
+                st.download_button(label="Descargar PDF", data=pdf_file, file_name="Cotizacion_Inversion_Patrimonial.pdf", mime="application/pdf")
+
     st.write("Esta es una aplicación interactiva creada para simular ETFs y carteras patrimoniales.")
+
 
